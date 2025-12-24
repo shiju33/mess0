@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mess Expense Manager</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f0f2f5; margin: 0; padding: 20px; }
+        .card { max-width: 500px; margin: auto; background: white; padding: 25px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        h2 { text-align: center; color: #1a73e8; margin-top: 0; }
+        .input-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; color: #555; }
+        select, input { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; font-size: 16px; }
+        button { width: 100%; padding: 12px; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; margin-bottom: 10px; transition: 0.3s; }
+        .btn-add { background-color: #28a745; color: white; }
+        .btn-excel { background-color: #1d6f42; color: white; }
+        .btn-delete { background-color: #dc3545; color: white; padding: 5px 10px; width: auto; font-size: 12px; }
+        
+        .summary-box { background: #e8f0fe; padding: 15px; border-radius: 10px; margin-top: 20px; }
+        .balance-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #d1d1d1; }
+        .history { margin-top: 20px; max-height: 200px; overflow-y: auto; border: 1px solid #eee; padding: 10px; border-radius: 8px; }
+        .history-item { font-size: 13px; display: flex; justify-content: space-between; align-items: center; padding: 5px 0; border-bottom: 1px solid #eee; }
+        .plus { color: #28a745; font-weight: bold; }
+        .minus { color: #dc3545; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+<div class="card">
+    <h2>Mess Manager</h2>
+    
+    <div class="input-group">
+        <label>Who Paid?</label>
+        <select id="payer">
+            <option value="Rony">Rony</option>
+            <option value="Shiju">Shiju</option>
+            <option value="Ameer">Ameer</option>
+        </select>
+    </div>
+
+    <div class="input-group">
+        <label>Amount</label>
+        <input type="number" id="amount" placeholder="0.00">
+    </div>
+
+    <div class="input-group">
+        <label>Item Description</label>
+        <input type="text" id="desc" placeholder="Vegetables, Rice, etc.">
+    </div>
+
+    <button class="btn-add" onclick="addExpense()">+ Add Expense</button>
+    <button class="btn-excel" onclick="exportToExcel()">📊 Export to Excel</button>
+
+    <div class="summary-box">
+        <div id="summary"></div>
+    </div>
+
+    <h3>History (This Month)</h3>
+    <div id="historyList" class="history"></div>
+</div>
+
+<script>
+    let expenses = JSON.parse(localStorage.getItem('messData')) || [];
+
+    function addExpense() {
+        const payer = document.getElementById('payer').value;
+        const amount = parseFloat(document.getElementById('amount').value);
+        const desc = document.getElementById('desc').value || "Mess Expense";
+        const date = new Date().toLocaleDateString();
+
+        if (!amount || amount <= 0) return alert("Enter a valid amount");
+
+        expenses.push({ id: Date.now(), date, payer, desc, amount });
+        saveAndRender();
+        document.getElementById('amount').value = '';
+        document.getElementById('desc').value = '';
+    }
+
+    function deleteExpense(id) {
+        expenses = expenses.filter(e => e.id !== id);
+        saveAndRender();
+    }
+
+    function saveAndRender() {
+        localStorage.setItem('messData', JSON.stringify(expenses));
+        render();
+    }
+
+    function render() {
+        let total = 0;
+        let paid = { Rony: 0, Shiju: 0, Ameer: 0 };
+        let historyHtml = '';
+
+        expenses.forEach(e => {
+            total += e.amount;
+            paid[e.payer] += e.amount;
+            historyHtml = `
+                <div class="history-item">
+                    <span><b>${e.payer}</b>: ${e.amount} (${e.desc})</span>
+                    <button class="btn-delete" onclick="deleteExpense(${e.id})">Delete</button>
+                </div>` + historyHtml;
+        });
+
+        const share = total / 3;
+        let summaryHtml = `<strong>Total: ${total.toFixed(2)}</strong><br>Share per person: ${share.toFixed(2)}<hr>`;
+        
+        for (let p in paid) {
+            let bal = paid[p] - share;
+            let cls = bal >= 0 ? 'plus' : 'minus';
+            let txt = bal >= 0 ? 'Gets back' : 'Owes';
+            summaryHtml += `<div class="balance-row"><span>${p}</span> <span class="${cls}">${txt}: ${Math.abs(bal).toFixed(2)}</span></div>`;
+        }
+
+        document.getElementById('summary').innerHTML = summaryHtml;
+        document.getElementById('historyList').innerHTML = historyHtml;
+    }
+
+    function exportToExcel() {
+        if(expenses.length === 0) return alert("No data to export");
+        const worksheet = XLSX.utils.json_to_sheet(expenses);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, "Monthly Mess");
+        XLSX.writeFile(workbook, "Mess_Expenses.xlsx");
+    }
+
+    render();
+</script>
+
+</body>
+</html>
